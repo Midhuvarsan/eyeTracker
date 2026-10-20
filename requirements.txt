@@ -1,0 +1,10 @@
+torch
+torchvision
+timm
+huggingface_hub
+safetensors
+pillow
+numpy
+opencv-python
+flask
+gunicorn

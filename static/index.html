@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retina screening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #edf1f4;
+  --panel: #f7f9fb;
+  --ink: #16202b;
+  --muted: #566475;
+  --rule: #d3dae1;
+  --primary: #0e5f73;
+  --primary-ink: #ffffff;
+  --flag: #b3412f;
+  --ok: #2b6b4c;
+  --caution: #8f5f00;
+  --bar: #9fb0c0;
+  --focus: #0e5f73;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10161c;
+    --panel: #161e26;
+    --ink: #e6ebf0;
+    --muted: #9aa7b5;
+    --rule: #2a3541;
+    --primary: #5bb7cf;
+    --primary-ink: #08222a;
+    --flag: #e8806d;
+    --ok: #6cc49a;
+    --caution: #e0b25a;
+    --bar: #4a5b6c;
+    --focus: #5bb7cf;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font: 16px/1.55 "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+h1, h2, h3 { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-weight: 600; margin: 0; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app { display: grid; grid-template-columns: minmax(300px, 390px) 1fr; min-height: 100vh; }
+
+/* ---------- left column: the scan ---------- */
+.side {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  padding: 36px 30px 32px;
+  background: var(--panel);
+  border-right: 1px solid var(--rule);
+  display: flex; flex-direction: column; gap: 26px;
+}
+.side h1 { font-size: 2rem; line-height: 1.1; letter-spacing: -0.01em; }
+.lede { margin-top: 10px; color: var(--muted); font-size: 0.95rem; max-width: 34ch; }
+.status { margin-top: 14px; font-size: 0.85rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--caution); flex: none; }
+.status.ready .dot { background: var(--ok); }
+.status.error .dot { background: var(--flag); }
+.status.loading .dot { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+
+.group h2 { font-size: 1.15rem; margin-bottom: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; margin-bottom: 18px; }
+.seg button { background: transparent; border: 0; padding: 7px 14px; cursor: pointer; font-size: 0.9rem; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); }
+
+.slots { display: flex; gap: 18px; flex-wrap: wrap; }
+.slot { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 100%; }
+.drop { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; cursor: pointer; max-width: 100%; }
+.lens {
+  --size: 168px;
+  width: var(--size); height: var(--size); border-radius: 50%;
+  border: 2px dashed var(--muted);
+  display: grid; place-items: center; text-align: center;
+  color: var(--muted); font-size: 0.85rem; padding: 14px;
+  background: transparent; overflow: hidden; position: relative;
+  transition: border-color .15s, background .15s;
+}
+.slots.both .lens { --size: 128px; }
+.drop:hover .lens, .drop.over .lens { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.drop:focus-within .lens { outline: 3px solid var(--focus); outline-offset: 3px; }
+.lens img { display: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.drop.filled .lens { border: 2px solid var(--ink); background: #000; }
+.drop.filled .lens img { display: block; }
+.drop.filled .hint { display: none; }
+.slot-name { font-weight: 600; font-size: 0.95rem; }
+.file { font-size: 0.8rem; color: var(--muted); max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--primary); text-decoration: underline; cursor: pointer; font-size: 0.85rem; }
+.note-side { font-size: 0.85rem; color: var(--flag); min-height: 1.2em; margin-top: 10px; }
+
+.samples { display: flex; flex-wrap: wrap; gap: 8px; }
+.samples button {
+  background: transparent; border: 1px solid var(--rule); border-radius: 4px;
+  padding: 5px 10px; font-size: 0.85rem; cursor: pointer;
+}
+.samples button:hover { border-color: var(--primary); color: var(--primary); }
+.samples-lead { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+
+.opts { display: flex; flex-direction: column; gap: 10px; }
+.opt { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; cursor: pointer; }
+.opt input { margin-top: 4px; accent-color: var(--primary); }
+.opt small { display: block; color: var(--muted); font-size: 0.8rem; }
+
+.go {
+  background: var(--primary); color: var(--primary-ink); border: 0; border-radius: 6px;
+  padding: 13px 18px; font-weight: 600; font-size: 1rem; cursor: pointer; width: 100%;
+}
+.go:disabled { opacity: .45; cursor: not-allowed; }
+.go-hint { font-size: 0.82rem; color: var(--muted); margin-top: 8px; min-height: 1.2em; }
+
+/* ---------- right column: the report ---------- */
+.main { padding: 40px clamp(20px, 4vw, 64px) 72px; max-width: 920px; }
+.empty h2 { font-size: clamp(1.8rem, 3.2vw, 2.6rem); line-height: 1.12; max-width: 18ch; letter-spacing: -0.01em; }
+.empty p { margin-top: 16px; color: var(--muted); max-width: 52ch; }
+.empty ul { margin: 22px 0 0; padding-left: 1.1em; color: var(--muted); max-width: 52ch; }
+.empty li + li { margin-top: 6px; }
+
+.busy h2 { font-size: 1.6rem; }
+.busy p { color: var(--muted); margin-top: 8px; max-width: 52ch; }
+.track { height: 4px; background: var(--rule); margin-top: 22px; max-width: 420px; overflow: hidden; border-radius: 2px; }
+.track i { display: block; height: 100%; width: 35%; background: var(--primary); animation: slide 1.4s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+.error { border-left: 4px solid var(--flag); padding: 4px 0 4px 16px; max-width: 60ch; }
+.error h2 { font-size: 1.4rem; }
+.error p { margin-top: 6px; color: var(--muted); }
+
+.verdict { border-left: 5px solid var(--bar); padding: 2px 0 2px 22px; }
+.verdict h2 { font-size: clamp(2rem, 4.4vw, 3.3rem); line-height: 1.06; letter-spacing: -0.015em; }
+.verdict .sub { margin-top: 10px; font-size: 1.15rem; max-width: 40ch; }
+.verdict .meta { margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
+.v-disease { border-color: var(--flag); }
+.v-disease h2 { color: var(--flag); }
+.v-normal { border-color: var(--ok); }
+.v-normal h2 { color: var(--ok); }
+.v-inconclusive { border-color: var(--caution); }
+.v-inconclusive h2 { color: var(--caution); }
+
+.caveat { margin-top: 18px; border-left: 3px solid var(--caution); padding-left: 14px; font-size: 0.92rem; color: var(--muted); max-width: 62ch; }
+
+.sec { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--rule); }
+.sec > h2 { font-size: 1.5rem; }
+.sec > .lead { margin-top: 6px; color: var(--muted); font-size: 0.92rem; max-width: 62ch; }
+
+.scores { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 12px; }
+.scores li { display: grid; grid-template-columns: 250px 1fr 48px; gap: 14px; align-items: center; }
+.scores .nm { font-size: 0.95rem; }
+.scores li.flag .nm { font-weight: 600; }
+.tag { margin-left: 8px; font-size: 0.75rem; font-weight: 600; color: var(--flag); border: 1px solid var(--flag); border-radius: 3px; padding: 0 5px; }
+.bar { height: 10px; background: color-mix(in srgb, var(--bar) 28%, transparent); border-radius: 5px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--bar); border-radius: 5px; }
+.scores li.flag .bar i { background: var(--flag); }
+.val { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+
+.detail + .detail { margin-top: 36px; }
+.detail h3 { font-size: 1.35rem; margin-top: 22px; }
+.rel { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
+.relbar { width: 90px; height: 6px; background: color-mix(in srgb, var(--bar) 28%, transparent); border-radius: 3px; overflow: hidden; flex: none; }
+.relbar i { display: block; height: 100%; background: var(--primary); }
+.weak { margin-top: 10px; font-size: 0.9rem; color: var(--flag); max-width: 62ch; }
+dl.facts { margin: 18px 0 0; display: grid; grid-template-columns: 11rem 1fr; gap: 12px 24px; max-width: 76ch; }
+dl.facts dt { font-weight: 600; font-size: 0.95rem; }
+dl.facts dd { margin: 0; }
+
+.eyes { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; margin: 18px 0 14px; }
+.eyes button { background: transparent; border: 0; padding: 6px 14px; cursor: pointer; font-size: 0.9rem; }
+.eyes button + button { border-left: 1px solid var(--rule); }
+.eyes button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); }
+
+.compare { position: relative; width: 100%; max-width: 520px; margin-top: 18px; touch-action: pan-y; user-select: none; cursor: ew-resize; background: #000; }
+.eyes + .compare { margin-top: 0; }
+.compare img { display: block; width: 100%; height: auto; pointer-events: none; }
+.compare .over { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--pos)); }
+.compare .handle { position: absolute; top: 0; bottom: 0; left: var(--pos); width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+.compare .handle::after { content: ""; position: absolute; top: 50%; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+.slider { display: flex; align-items: center; gap: 12px; margin-top: 12px; max-width: 520px; font-size: 0.85rem; color: var(--muted); }
+.slider input { flex: 1; accent-color: var(--primary); }
+.cap { margin-top: 12px; font-size: 0.88rem; color: var(--muted); max-width: 62ch; }
+.pending { margin-top: 16px; color: var(--muted); max-width: 62ch; }
+
+.disclaimer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--rule); font-size: 0.85rem; color: var(--muted); max-width: 70ch; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); padding: 28px 20px; }
+  .main { padding: 28px 20px 56px; }
+}
+@media (max-width: 640px) {
+  .scores li { grid-template-columns: 1fr 44px; }
+  .scores .bar { grid-column: 1 / 2; grid-row: 2; }
+  .scores .val { grid-column: 2; grid-row: 1 / 3; }
+  dl.facts { grid-template-columns: 1fr; gap: 2px; }
+  dl.facts dd { margin-bottom: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .track i, .status.loading .dot { animation: none; }
+  .lens { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <header>
+      <h1>Retina screening</h1>
+      <p class="lede">Add a retinal fundus photo. The model screens it for eight conditions and explains what it found.</p>
+      <p class="status loading" id="status" role="status"><span class="dot"></span><span id="statusText">Checking the model…</span></p>
+    </header>
+
+    <section class="group" aria-labelledby="photoHead">
+      <h2 id="photoHead">Photo</h2>
+      <div class="seg" role="group" aria-label="How many images">
+        <button type="button" id="modeSingle" aria-pressed="true">One image</button>
+        <button type="button" id="modeBoth" aria-pressed="false">Both eyes</button>
+      </div>
+
+      <div class="slots" id="slots">
+        <div class="slot" id="slot-image">
+          <label class="drop">
+            <input class="sr" type="file" accept="image/*">
+            <span class="lens"><img alt=""><span class="hint">Drop a photo or click to choose</span></span>
+            <span class="slot-name">Fundus image</span>
+            <span class="file">No file chosen</span>
+          </label>
+          <button type="button" class="linkbtn remove" hidden>Remove</button>
+        </div>
+        <div class="slot" id="slot-left" hidden>
+          <label class="drop">
+            <input class="sr" type="file" accept="image/*">
+            <span class="lens"><img alt=""><span class="hint">Left eye</span></span>
+            <span class="slot-name">Left eye</span>
+            <span class="file">No file chosen</span>
+          </label>
+          <button type="button" class="linkbtn remove" hidden>Remove</button>
+        </div>
+        <div class="slot" id="slot-right" hidden>
+          <label class="drop">
+            <input class="sr" type="file" accept="image/*">
+            <span class="lens"><img alt=""><span class="hint">Right eye</span></span>
+            <span class="slot-name">Right eye</span>
+            <span class="file">No file chosen</span>
+          </label>
+          <button type="button" class="linkbtn remove" hidden>Remove</button>
+        </div>
+      </div>
+      <p class="note-side" id="sideNote" role="alert"></p>
+    </section>
+
+    <section class="group" id="samplesBox" hidden>
+      <p class="samples-lead">Or try a sample image from your project folder.</p>
+      <div class="samples" id="samples"></div>
+    </section>
+
+    <section class="group opts" aria-label="Options">
+      <label class="opt"><input type="checkbox" id="wantHeat" checked>
+        <span>Show which regions drove the result<small>Takes longer, especially on a CPU.</small></span></label>
+      <label class="opt"><input type="checkbox" id="fast">
+        <span>Faster, slightly less accurate<small>Skips test-time augmentation.</small></span></label>
+    </section>
+
+    <div>
+      <button type="button" class="go" id="go" disabled>Analyze image</button>
+      <p class="go-hint" id="goHint"></p>
+    </div>
+  </aside>
+
+  <main class="main" id="out" aria-live="polite"></main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (sel, root = document) => root.querySelector(sel);
+
+  function el(tag, attrs = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) {
+      if (kid == null || kid === false) continue;
+      n.append(kid.nodeType ? kid : document.createTextNode(kid));
+    }
+    return n;
+  }
+  const pct = p => (p < 0.005 ? "<1%" : Math.round(p * 100) + "%");
+
+  /* ---------------- state ---------------- */
+  let mode = "single";
+  let runId = 0;
+  const files = { image: null, left: null, right: null };
+  const out = $("#out");
+  const go = $("#go");
+
+  /* ---------------- model status ---------------- */
+  const statusEl = $("#status"), statusText = $("#statusText");
+  async function pollHealth() {
+    try {
+      const h = await (await fetch("/api/health")).json();
+      if (h.ready) {
+        statusEl.className = "status ready";
+        statusText.textContent = `Model ready (${h.device}).`;
+        return;
+      }
+      if (h.error) {
+        statusEl.className = "status error";
+        statusText.textContent = `The model failed to load: ${h.error}`;
+        return;
+      }
+      statusEl.className = "status loading";
+      statusText.textContent = "Loading the model. The first start downloads about 300 MB.";
+    } catch {
+      statusEl.className = "status error";
+      statusText.textContent = "Can’t reach the server. Start it with python app.py.";
+    }
+    setTimeout(pollHealth, 2000);
+  }
+  pollHealth();
+
+  /* ---------------- upload slots ---------------- */
+  const slots = {};
+  for (const key of ["image", "left", "right"]) {
+    const root = $("#slot-" + key);
+    const s = slots[key] = {
+      root, drop: $(".drop", root), input: $("input", root), img: $("img", root),
+      name: $(".file", root), remove: $(".remove", root), url: null,
+    };
+    s.input.addEventListener("change", () => { if (s.input.files[0]) setFile(key, s.input.files[0]); });
+    for (const ev of ["dragenter", "dragover"]) s.drop.addEventListener(ev, e => { e.preventDefault(); s.drop.classList.add("over"); });
+    for (const ev of ["dragleave", "drop"]) s.drop.addEventListener(ev, e => { e.preventDefault(); s.drop.classList.remove("over"); });
+    s.drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) setFile(key, f); });
+    s.img.addEventListener("error", () => s.drop.classList.remove("filled"));
+    s.remove.addEventListener("click", () => clearFile(key));
+  }
+
+  function setFile(key, file) {
+    const note = $("#sideNote");
+    note.textContent = "";
+    if (!/^image\//.test(file.type) && !/\.(png|jpe?g|tiff?|bmp|webp)$/i.test(file.name)) {
+      note.textContent = "Choose an image file (JPG, PNG or TIFF).";
+      return;
+    }
+    const s = slots[key];
+    if (s.url) URL.revokeObjectURL(s.url);
+    files[key] = file;
+    s.url = URL.createObjectURL(file);
+    s.img.src = s.url;
+    s.drop.classList.add("filled");
+    s.name.textContent = file.name;
+    s.remove.hidden = false;
+    updateGo();
+  }
+
+  function clearFile(key) {
+    const s = slots[key];
+    if (s.url) URL.revokeObjectURL(s.url);
+    s.url = null; files[key] = null;
+    s.input.value = ""; s.img.removeAttribute("src");
+    s.drop.classList.remove("filled");
+    s.name.textContent = "No file chosen";
+    s.remove.hidden = true;
+    updateGo();
+  }
+
+  function setMode(m) {
+    mode = m;
+    $("#modeSingle").setAttribute("aria-pressed", String(m === "single"));
+    $("#modeBoth").setAttribute("aria-pressed", String(m === "both"));
+    $("#slots").classList.toggle("both", m === "both");
+    slots.image.root.hidden = m !== "single";
+    slots.left.root.hidden = slots.right.root.hidden = m !== "both";
+    updateGo();
+  }
+  $("#modeSingle").addEventListener("click", () => setMode("single"));
+  $("#modeBoth").addEventListener("click", () => setMode("both"));
+
+  function updateGo() {
+    const hint = $("#goHint");
+    const ok = mode === "single" ? !!files.image : !!(files.left || files.right);
+    go.disabled = !ok || go.dataset.busy === "1";
+    if (mode === "both" && (files.left ? !files.right : !!files.right)) hint.textContent = "With one eye only, the model uses that photo for both. Add the other eye for better accuracy.";
+    else if (!ok) hint.textContent = "Add a photo to enable analysis.";
+    else hint.textContent = "";
+  }
+
+  /* ---------------- samples ---------------- */
+  (async function loadSamples() {
+    try {
+      const list = await (await fetch("/api/samples")).json();
+      if (!list.length) return;
+      const box = $("#samples");
+      for (const s of list) {
+        box.append(el("button", { type: "button", text: s.label, onclick: async () => {
+          try {
+            const blob = await (await fetch("/samples/" + encodeURIComponent(s.name))).blob();
+            setMode("single");
+            setFile("image", new File([blob], s.name, { type: blob.type || "image/png" }));
+          } catch { $("#sideNote").textContent = "Couldn’t load that sample."; }
+        } }));
+      }
+      $("#samplesBox").hidden = false;
+    } catch { /* samples are optional */ }
+  })();
+
+  /* ---------------- report rendering ---------------- */
+  function timer(node, label) {
+    const t0 = Date.now();
+    const tick = () => { node.textContent = `${label} ${Math.floor((Date.now() - t0) / 1000)} s elapsed.`; };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }
+
+  function showEmpty() {
+    out.replaceChildren(el("section", { class: "empty" },
+      el("h2", { text: "Add a fundus photo to see the result here." }),
+      el("p", { text: "You get a screening verdict, a score for each condition, a plain-language explanation of anything flagged, and a map of the retinal regions that drove the result." }),
+      el("ul", {},
+        el("li", { text: "Use a retinal fundus photo, not a photo of the outside of the eye." }),
+        el("li", { text: "Two photos (left and right eye) give the most accurate result." }),
+        el("li", { text: "This is a research tool and does not replace an eye exam." }))));
+  }
+  showEmpty();
+
+  let stopTimer = () => {};
+  function showBusy() {
+    stopTimer();
+    const line = el("p", { class: "elapsed" });
+    out.replaceChildren(el("section", { class: "busy" },
+      el("h2", { text: "Analyzing the photo" }),
+      el("p", { text: "The model is reading the image. On a CPU this can take a few seconds to half a minute." }),
+      line, el("div", { class: "track", "aria-hidden": "true" }, el("i"))));
+    stopTimer = timer(line, "Running the model.");
+  }
+
+  function showError(msg) {
+    stopTimer();
+    out.replaceChildren(el("section", { class: "error", role: "alert" },
+      el("h2", { text: "The analysis didn’t finish" }), el("p", { text: msg })));
+  }
+
+  function renderResult(data) {
+    stopTimer();
+    const titles = { disease: "Possible disease detected", normal: "No disease detected", inconclusive: "Inconclusive result" };
+    const top = data.classes[0];
+    const flaggedNames = data.classes.filter(c => c.flagged && c.code !== "N").map(c => c.name);
+    const sub = data.verdict === "disease" ? flaggedNames.join(", ")
+      : data.verdict === "normal" ? "The model found nothing it associates with the conditions it knows."
+      : `No condition passed its threshold. The highest score was ${top.name} at ${pct(top.prob)}.`;
+
+    const parts = [];
+    parts.push(el("section", { class: `verdict v-${data.verdict}` },
+      el("h2", { text: titles[data.verdict] }),
+      el("p", { class: "sub", text: sub }),
+      el("p", { class: "meta", text: `Analyzed in ${data.seconds.toFixed(1)} seconds on ${data.device}.` })));
+    if (data.single) parts.push(el("p", { class: "caveat", text: "You gave one image, so the model used it for both eyes. Results can be less accurate than with a photo of each eye." }));
+    if (data.conflict) parts.push(el("p", { class: "caveat", text: "The model also flagged Normal, so its answer is mixed. Treat this result with extra caution." }));
+
+    const list = el("ul", { class: "scores" });
+    for (const c of data.classes) {
+      list.append(el("li", { class: c.flagged ? "flag" : "" },
+        el("span", { class: "nm" }, c.name, c.flagged ? el("span", { class: "tag", text: "Flagged" }) : null),
+        el("span", { class: "bar", role: "img", "aria-label": `${c.name}: ${pct(c.prob)}` }, el("i", { style: `width:${Math.max(c.prob * 100, 1)}%` })),
+        el("span", { class: "val", text: pct(c.prob) })));
+    }
+    parts.push(el("section", { class: "sec" },
+      el("h2", { text: "Score for each condition" }),
+      el("p", { class: "lead", text: "Scores are independent, so they don’t add up to 100%. A condition is flagged when its score passes the threshold the model learned for that condition." }),
+      list));
+
+    if (data.details.length) {
+      const sec = el("section", { class: "sec" },
+        el("h2", { text: data.verdict === "disease" ? "What was flagged" : "About this result" }));
+      for (const d of data.details) {
+        sec.append(el("article", { class: "detail" },
+          el("h3", { text: d.name }),
+          el("div", { class: "rel" },
+            el("span", { class: "relbar", "aria-hidden": "true" }, el("i", { style: `width:${Math.round((d.f1 || 0) * 100)}%` })),
+            el("span", { text: `Model reliability for this condition: F1 ${(d.f1 || 0).toFixed(2)} on its own validation data` })),
+          d.unreliable ? el("p", { class: "weak", text: "The model is weak on this condition, so treat the flag as a faint signal and not a finding." }) : null,
+          el("dl", { class: "facts" },
+            el("dt", { text: "What it is" }), el("dd", { text: d.what }),
+            el("dt", { text: "Typical signs" }), el("dd", { text: d.signs }),
+            el("dt", { text: "Why it matters" }), el("dd", { text: d.risk }),
+            el("dt", { text: "Suggested next step" }), el("dd", { text: d.next }))));
+      }
+      parts.push(sec);
+    }
+
+    let heatBox = null;
+    if (data.explain_code && $("#wantHeat").checked) {
+      heatBox = el("section", { class: "sec" });
+      parts.push(heatBox);
+    }
+    parts.push(el("p", { class: "disclaimer", text: "This is a research model that has not been clinically validated. Its output is not a diagnosis. See an eye doctor to confirm any finding." }));
+    out.replaceChildren(...parts);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return heatBox;
+  }
+
+  function compare(eye) {
+    const wrap = el("div", { class: "compare", style: "--pos:50%" });
+    wrap.append(
+      el("img", { src: eye.original, alt: `${eye.eye} eye, original photo` }),
+      el("img", { class: "over", src: eye.overlay, alt: `${eye.eye} eye with the region map on top` }),
+      el("span", { class: "handle", "aria-hidden": "true" }));
+    const range = el("input", { type: "range", min: "0", max: "100", value: "50", "aria-label": "Slide to compare the original photo with the region map" });
+    const set = v => { wrap.style.setProperty("--pos", v + "%"); range.value = v; };
+    range.addEventListener("input", () => set(range.value));
+    const fromPointer = e => {
+      const r = wrap.getBoundingClientRect();
+      set(Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)));
+    };
+    wrap.addEventListener("pointerdown", e => { wrap.setPointerCapture(e.pointerId); fromPointer(e); wrap.onpointermove = fromPointer; });
+    for (const ev of ["pointerup", "pointercancel"]) wrap.addEventListener(ev, () => { wrap.onpointermove = null; });
+    return el("div", {}, wrap, el("div", { class: "slider" }, el("span", { text: "Original" }), range, el("span", { text: "Region map" })));
+  }
+
+  async function loadHeatmap(data, id, box) {
+    const line = el("p", { class: "pending" });
+    box.replaceChildren(el("h2", { text: "Regions that drove the result" }), line);
+    const stop = timer(line, "Hiding parts of the image one at a time to see what matters. This runs the model many times.");
+    try {
+      const r = await fetch("/api/explain", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: data.token, code: data.explain_code, grid: 6 }),
+      });
+      const j = await r.json().catch(() => ({ error: "The server sent an unreadable reply." }));
+      if (!r.ok) throw new Error(j.error || "Could not build the region map.");
+      if (id !== runId) return;
+      stop();
+      const holder = el("div");
+      const show = i => holder.replaceChildren(compare(j.eyes[i]));
+      const head = [el("h2", { text: "Regions that drove the result" }),
+        el("p", { class: "lead", text: `Shown for ${j.name}, the strongest flagged condition.` })];
+      let tabs = null;
+      if (j.eyes.length > 1) {
+        tabs = el("div", { class: "eyes", role: "group", "aria-label": "Eye" });
+        j.eyes.forEach((e, i) => tabs.append(el("button", { type: "button", "aria-pressed": String(i === 0), text: e.eye === "left" ? "Left eye" : "Right eye",
+          onclick: () => { [...tabs.children].forEach((b, k) => b.setAttribute("aria-pressed", String(k === i))); show(i); } })));
+      }
+      show(0);
+      box.replaceChildren(...head, tabs, holder,
+        el("p", { class: "cap", text: "Warmer colors mark areas where hiding the image lowered the model’s confidence the most. This shows where the model looked, not a clinical finding." }));
+    } catch (e) {
+      stop();
+      if (id !== runId) return;
+      box.replaceChildren(el("h2", { text: "Regions that drove the result" }),
+        el("p", { class: "pending", text: (e && e.name === "TypeError") ? "Can’t reach the server. Check that python app.py is still running." : e.message }));
+    }
+  }
+
+  /* ---------------- analyze ---------------- */
+  function setBusy(b) { go.dataset.busy = b ? "1" : "0"; go.textContent = b ? "Analyzing…" : "Analyze image"; updateGo(); }
+
+  async function analyze() {
+    const id = ++runId;
+    const fd = new FormData();
+    if (mode === "single") fd.append("image", files.image);
+    else if (files.left && files.right) { fd.append("left", files.left); fd.append("right", files.right); }
+    else fd.append("image", files.left || files.right);
+    fd.append("tta", $("#fast").checked ? "0" : "1");
+
+    setBusy(true);
+    showBusy();
+    let data;
+    try {
+      const r = await fetch("/api/predict", { method: "POST", body: fd });
+      data = await r.json().catch(() => ({ error: "The server sent an unreadable reply." }));
+      if (!r.ok) throw new Error(data.error || "Analysis failed.");
+    } catch (e) {
+      if (id !== runId) return;
+      showError((e && e.name === "TypeError") ? "Can’t reach the server. Check that python app.py is still running, then try again." : e.message);
+      setBusy(false);
+      return;
+    }
+    if (id !== runId) return;
+    const heatBox = renderResult(data);
+    setBusy(false);
+    if (heatBox) loadHeatmap(data, id, heatBox);
+  }
+  go.addEventListener("click", analyze);
+  setMode("single");
+})();
+</script>
+</body>
+</html>

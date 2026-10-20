@@ -1,0 +1,73 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---------- Virtual environments ----------
+venv/
+.venv/
+env/
+ENV/
+
+# ---------- Secrets / config ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------- Model weights & caches ----------
+# (weights are downloaded from Hugging Face at runtime via hf_hub_download)
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+.cache/
+.huggingface/
+huggingface/
+models/
+checkpoints/
+
+# ---------- Generated output ----------
+# main.py writes its overlay to result.png by default
+result.png
+output/
+outputs/
+results/
+
+# ---------- Uploads / patient data ----------
+# Never commit user-uploaded or real medical images
+uploads/
+tmp/
+temp/
+
+# ---------- Jupyter ----------
+.ipynb_checkpoints/
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- IDEs / editors ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- OS files ----------
+.DS_Store
+Thumbs.db
+desktop.ini

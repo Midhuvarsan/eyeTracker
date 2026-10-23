@@ -25,18 +25,23 @@ import uuid
 from collections import OrderedDict
 
 import cv2
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from PIL import Image, UnidentifiedImageError
 from werkzeug.exceptions import HTTPException
 
+# Load .env file
+load_dotenv()
+
 import main as pipeline  # your existing pipeline: load_model, occlusion_map, overlay
 from disease_info import F1, INFO
+from llm_explain import explain_prediction
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "static")
 SAMPLE_EXT = (".png", ".jpg", ".jpeg")
-MAX_SESSIONS = 16
-MAX_SIDE = 1600  # downscale huge uploads; the model works at 448 px anyway
+MAX_SESSIONS = int(os.environ.get("MAX_SESSIONS", 16))
+MAX_SIDE = int(os.environ.get("MAX_SIDE", 1600))  # downscale huge uploads; the model works at 448 px anyway
 
 app = Flask(__name__, static_folder=STATIC, static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
@@ -222,6 +227,21 @@ def api_explain():
     return jsonify(code=code, name=info_for(code)["name"], eyes=session["cache"][key])
 
 
+@app.post("/api/llm-explain")
+def api_llm_explain():
+    data = request.get_json(silent=True) or {}
+    session = SESSIONS.get(data.get("token"))
+    if session is None:
+        raise ApiError("This analysis has expired. Analyze the image again.", 404)
+    code = data.get("code")
+    if not code or code not in session["probs"]:
+        raise ApiError("Unknown disease code.", 400)
+    prob = session["probs"][code]
+    single = session.get("single", False)
+    result = explain_prediction(code, prob, session["probs"], single_eye=single)
+    return jsonify(result)
+
+
 # ----------------------------------------------------------------------------
 # errors always come back as JSON so the page can show a clear message
 # ----------------------------------------------------------------------------
@@ -251,6 +271,10 @@ def _preload():
 
 
 if __name__ == "__main__":
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t", "yes")
+
     threading.Thread(target=_preload, daemon=True).start()
-    print("\nOpen http://127.0.0.1:5000 in your browser (the model loads in the background).\n")
-    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+    print(f"\nOpen http://{host}:{port} in your browser (the model loads in the background).\n")
+    app.run(host=host, port=port, debug=debug, threaded=True)

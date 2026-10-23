@@ -8,3 +8,6 @@ numpy
 opencv-python
 flask
 gunicorn
+google-generativeai
+groq
+python-dotenv
